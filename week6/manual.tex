@@ -1,0 +1,377 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\setlength{\parskip}{0.65em}
+\setlength{\parindent}{0pt}
+
+\title{Linear \& Logistic Regression + Regularisasi L2 (Ridge)\\
+Hitungan Manual Sangat Detail}
+\author{TRPL}
+
+\begin{document}
+\maketitle
+
+\section{Tujuan Dokumen}
+Dokumen ini menyajikan hitungan manual langkah demi langkah untuk:
+\begin{itemize}
+  \item \textbf{Linear Regression}: normal equation, prediksi, MSE, dan Ridge (L2).
+  \item \textbf{Logistic Regression}: sigmoid, log-loss, gradien, satu langkah GD.
+  \item \textbf{Regularisasi L2}: penambahan penalti pada fungsi objektif dan efeknya.
+\end{itemize}
+Fokus pada contoh kecil agar semua langkah dapat dihitung dengan kalkulator.
+
+\section{Linear Regression (1 fitur + bias)}
+\subsection{Model dan Tujuan}
+Model linier untuk satu fitur:
+\[
+\hat{y} \;=\; w\,x \;+\; b
+\]
+Dengan menyertakan bias sebagai kolom satuan di matriks desain, parameter kita tulis sebagai vektor:
+\[
+\bm{w_b} \;=\; \begin{bmatrix} w\\ b \end{bmatrix}.
+\]
+Untuk $n$ contoh, normal equation:
+\[
+\bm{\hat{w}_b} \;=\; (X^{\mathrm T}X)^{-1} X^{\mathrm T}\bm{y}.
+\]
+
+\subsection{Contoh Data Mini dan Pembentukan Matriks}
+Ambil data mini: $(x,y)=\{(1,1),(2,2),(3,2)\}$.
+\[
+X \;=\; \begin{bmatrix}
+1 & 1\\
+2 & 1\\
+3 & 1
+\end{bmatrix},
+\quad
+\bm{y} \;=\; \begin{bmatrix}
+1\\
+2\\
+2
+\end{bmatrix}.
+\]
+Kolom pertama $X$ adalah fitur $x$, kolom kedua adalah bias $1$.
+
+\subsection{Hitung $X^{\mathrm T}X$ dan $X^{\mathrm T}\bm{y}$}
+\[
+X^{\mathrm T}X
+=
+\begin{bmatrix}
+1 & 2 & 3\\
+1 & 1 & 1
+\end{bmatrix}
+\begin{bmatrix}
+1 & 1\\
+2 & 1\\
+3 & 1
+\end{bmatrix}
+=
+\begin{bmatrix}
+14 & 6\\
+6 & 3
+\end{bmatrix},
+\qquad
+X^{\mathrm T}\bm{y}
+=
+\begin{bmatrix}
+1 & 2 & 3\\
+1 & 1 & 1
+\end{bmatrix}
+\begin{bmatrix}
+1\\
+2\\
+2
+\end{bmatrix}
+=
+\begin{bmatrix}
+9\\
+5
+\end{bmatrix}.
+\]
+
+\subsection{Invers Matriks $2\times 2$ dan Solusi}
+Untuk $A=\begin{bmatrix}a&b\\c&d\end{bmatrix}$ berlaku
+\(
+A^{-1}=\dfrac{1}{ad-bc}\begin{bmatrix}d&-b\\-c&a\end{bmatrix}.
+\)
+Dengan $a=14,b=6,c=6,d=3$,
+\[
+ad-bc \;=\; 14\cdot 3 - 6\cdot 6 \;=\; 42-36 \;=\; 6,
+\qquad
+(X^{\mathrm T}X)^{-1}
+=\frac{1}{6}\begin{bmatrix}3&-6\\-6&14\end{bmatrix}.
+\]
+Maka
+\[
+\bm{\hat{w}_b}
+=
+\frac{1}{6}
+\begin{bmatrix}
+3 & -6\\
+-6 & 14
+\end{bmatrix}
+\begin{bmatrix}
+9\\
+5
+\end{bmatrix}
+=
+\frac{1}{6}
+\begin{bmatrix}
+27-30\\
+-54+70
+\end{bmatrix}
+=
+\frac{1}{6}
+\begin{bmatrix}
+-3\\
+16
+\end{bmatrix}
+=
+\begin{bmatrix}
+-0.5\\
+2.6667
+\end{bmatrix}.
+\]
+Jadi $\hat{w}=-0.5$ dan $\hat{b}\approx 2.6667$.
+
+\subsection{Prediksi dan MSE (cek manual)}
+Prediksi untuk $x=1,2,3$:
+\[
+\hat{y}(1)= -0.5\cdot 1 + 2.6667 = 2.1667,\quad
+\hat{y}(2)= -0.5\cdot 2 + 2.6667 = 1.6667,\quad
+\hat{y}(3)= -0.5\cdot 3 + 2.6667 = 1.1667.
+\]
+Residual $e_i=y_i-\hat{y}_i$:
+\[
+\{-1.1667,\; 0.3333,\; 0.8333\}.
+\]
+MSE:
+\[
+\mathrm{MSE}
+=
+\frac{(-1.1667)^2+(0.3333)^2+(0.8333)^2}{3}
+\;\approx\;
+\frac{1.3611+0.1111+0.6944}{3}
+\;=\; \frac{2.1666}{3}
+\;\approx\; 0.7222.
+\]
+
+\section{Ridge Regression (L2) — Solusi Tertutup}
+Ridge menambahkan penalti $\lambda\lVert \bm{w_b}\rVert_2^2$ sehingga solusi menjadi
+\[
+\bm{\hat{w}_b}^{(\mathrm{ridge})}
+=
+\big(X^{\mathrm T}X+\lambda I\big)^{-1}X^{\mathrm T}\bm{y}.
+\]
+Ambil $\lambda=1$:
+\[
+X^{\mathrm T}X+\lambda I
+=
+\begin{bmatrix}
+15 & 6\\
+6 & 4
+\end{bmatrix},
+\qquad
+\det = 15\cdot 4 - 6\cdot 6 = 24,
+\]
+\[
+\big(X^{\mathrm T}X+\lambda I\big)^{-1}
+=
+\frac{1}{24}
+\begin{bmatrix}
+4 & -6\\
+-6 & 15
+\end{bmatrix}.
+\]
+Sehingga
+\[
+\bm{\hat{w}_b}^{(\mathrm{ridge})}
+=
+\frac{1}{24}
+\begin{bmatrix}
+4 & -6\\
+-6 & 15
+\end{bmatrix}
+\begin{bmatrix}
+9\\
+5
+\end{bmatrix}
+=
+\frac{1}{24}
+\begin{bmatrix}
+36-30\\
+-54+75
+\end{bmatrix}
+=
+\frac{1}{24}
+\begin{bmatrix}
+6\\
+21
+\end{bmatrix}
+=
+\begin{bmatrix}
+0.25\\
+0.875
+\end{bmatrix}.
+\]
+Terlihat bobot menjadi lebih kecil (shrinkage), membantu stabilitas saat kolinearitas atau data terbatas.
+
+\section{Logistic Regression (biner)}
+\subsection{Model, Sigmoid, dan Log-Loss}
+Probabilitas kelas $1$:
+\[
+p \;=\; \sigma(z) \;=\; \frac{1}{1+e^{-z}},
+\qquad
+z \;=\; w\,x + b.
+\]
+Log-loss rata-rata:
+\[
+J(w,b)
+=
+\frac{1}{n}\sum_{i=1}^{n}
+\Big(-y_i\ln p_i - (1-y_i)\ln(1-p_i)\Big).
+\]
+Gradien (tanpa reguler):
+\[
+\frac{\partial J}{\partial w}
+=
+\frac{1}{n}\sum_{i=1}^n (p_i-y_i)\,x_i,
+\qquad
+\frac{\partial J}{\partial b}
+=
+\frac{1}{n}\sum_{i=1}^n (p_i-y_i).
+\]
+
+\subsection{Contoh Kecil dan Satu Langkah Gradient Descent}
+Ambil data:
+\[
+(x,y)=\{(0,0),(1,0),(2,1),(3,1)\},
+\qquad
+w=1,\; b=-1.
+\]
+Hitung $z_i=wx_i+b$ dan $p_i=\sigma(z_i)$:
+\[
+\begin{array}{c|c|c|c}
+i & x_i & z_i & p_i\\\hline
+1 & 0 & -1 & \frac{1}{1+e^{1}} \approx 0.2689\\
+2 & 1 & 0 & \frac{1}{1+e^{0}} = 0.5\\
+3 & 2 & 1 & \frac{1}{1+e^{-1}} \approx 0.7311\\
+4 & 3 & 2 & \frac{1}{1+e^{-2}} \approx 0.8808
+\end{array}
+\]
+Loss per contoh $\ell_i$:
+\[
+\ell_i
+=
+- \big(y_i\ln p_i + (1-y_i)\ln(1-p_i)\big).
+\]
+Rata-rata $J$ (pembulatan):
+\[
+J
+=
+\frac{0.3133+0.6931+0.3133+0.1269}{4}
+\approx 0.3617.
+\]
+Hitung selisih $(p_i-y_i)$:
+\[
+\{0.2689,\; 0.5,\; -0.2689,\; -0.1192\}.
+\]
+Gradien:
+\[
+\frac{\partial J}{\partial w}
+=
+\frac{1}{4}\Big(
+0.2689\cdot 0 + 0.5\cdot 1 - 0.2689\cdot 2 - 0.1192\cdot 3
+\Big)
+=
+\frac{-0.3954}{4}
+=
+-0.0989,
+\]
+\[
+\frac{\partial J}{\partial b}
+=
+\frac{1}{4}(0.2689+0.5-0.2689-0.1192)
+=
+\frac{0.3808}{4}
+=
+0.0952.
+\]
+Satu langkah GD dengan laju belajar $\eta=0.5$:
+\[
+w_{\mathrm{baru}}
+=
+w - \eta \frac{\partial J}{\partial w}
+=
+1 - 0.5\cdot (-0.0989)
+=
+1.04945,
+\]
+\[
+b_{\mathrm{baru}}
+=
+b - \eta \frac{\partial J}{\partial b}
+=
+-1 - 0.5\cdot 0.0952
+=
+-1.0476.
+\]
+Ulangi perhitungan untuk melihat $J$ menurun setelah update.
+
+\section{Regularisasi L2 (Ridge) pada Logistic}
+Tambahkan penalti kuadrat bobot:
+\[
+J_{\mathrm{reg}}
+=
+J + \lambda\, w^2
+\quad\Rightarrow\quad
+\frac{\partial J_{\mathrm{reg}}}{\partial w}
+=
+\frac{1}{n}\sum_{i=1}^{n}(p_i-y_i)\,x_i
+\;+\;
+2\lambda w.
+\]
+(Umumnya bias tidak direguler.)
+
+Lanjutkan contoh sebelumnya, ambil $\lambda=0.1$:
+\[
+\frac{\partial J_{\mathrm{reg}}}{\partial w}
+=
+-0.0989 + 2\cdot 0.1 \cdot 1
+=
+0.1011.
+\]
+Dengan $\eta=0.5$:
+\[
+w_{\mathrm{baru}}
+=
+1 - 0.5\cdot 0.1011
+=
+0.94945,
+\qquad
+b_{\mathrm{baru}}
+=
+-1 - 0.5\cdot 0.0952
+=
+-1.0476.
+\]
+Efek L2: mendorong $|w|$ mengecil (lebih konservatif), mengurangi overfitting.
+
+\section{Ringkasan Intuisi}
+\begin{itemize}
+  \item \textbf{Linear}: solusi normal memberikan $\hat{w},\hat{b}$; \textbf{Ridge} menstabilkan solusi saat kolinearitas/fitur banyak dengan mengecilkan bobot.
+  \item \textbf{Logistic}: memodelkan probabilitas via sigmoid; optimasi numerik memakai gradien. \textbf{L2} menambah term $2\lambda w$ pada gradien bobot.
+  \item Regularisasi mengurangi variance dan sering meningkatkan generalisasi, khususnya untuk data kecil/berisik.
+\end{itemize}
+
+\section{Latihan Manual}
+\begin{enumerate}
+  \item \textbf{Linear}: ganti data menjadi $(x,y)=\{(1,1),(2,2),(4,3)\}$, hitung $X^{\mathrm T}X$, $X^{\mathrm T}\bm{y}$, invers, $\hat{w},\hat{b}$, dan MSE.
+  \item \textbf{Ridge}: pada data awal, coba $\lambda\in\{0.5,\,5\}$, bandingkan $\hat{w},\hat{b}$.
+  \item \textbf{Logistic}: gunakan $w=0.5,b=-0.5$, hitung $z_i,p_i,\ell_i$, rata-rata $J$, lalu satu langkah GD dengan $\eta=0.2$ (tanpa reguler dan dengan L2 $\lambda=0.1$).
+  \item \textbf{Threshold}: gunakan probabilitas logistic, coba ambang $0.4$ dan $0.6$; hitung TP, FP, TN, FN secara manual.
+\end{enumerate}
+
+\end{document}
