@@ -67,7 +67,7 @@ def main():
 
     # 2. buka sumber video
     if USE_WEBCAM:
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(1)
     else:
         cap = cv2.VideoCapture(VIDEO_SOURCE)
 

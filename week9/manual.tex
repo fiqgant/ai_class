@@ -1,0 +1,219 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage{microtype}
+
+\setlist[itemize]{topsep=4pt,itemsep=2pt,leftmargin=1.4em}
+\setlist[enumerate]{topsep=4pt,itemsep=2pt,leftmargin=1.6em}
+
+\title{Hitungan Manual: BoW, TF--IDF, dan Cosine Similarity}
+\author{}
+\date{}
+
+\begin{document}
+\maketitlex
+
+\section*{1.\; Dataset Mainan}
+Tiga dokumen pendek (lowercase, tanpa penghapusan stopword agar mudah dihitung):
+\begin{itemize}
+  \item $d_1$: ``barang cepat sampai''
+  \item $d_2$: ``pengiriman cepat dan rapi''
+  \item $d_3$: ``sangat lambat pengiriman''
+\end{itemize}
+
+Kosakata global (urut abjad) kita tetapkan sebagai
+\[
+\mathcal{V}=\big[\text{barang},\text{cepat},\text{sampai},\text{pengiriman},\text{dan},\text{rapi},\text{sangat},\text{lambat}\big],
+\]
+dengan ukuran korpus $N=3$ dokumen.
+
+\section*{2.\; Bag-of-Words (BoW)}
+\subsection*{2.1\; Definisi}
+Representasi BoW untuk sebuah dokumen $d$ adalah vektor frekuensi:
+\[
+\mathrm{BoW}(d) = \big[f(w_1,d),\, f(w_2,d),\, \dots,\, f(w_V,d)\big],
+\]
+dengan $f(w_i,d)$ menyatakan jumlah kemunculan kata $w_i$ dalam $d$, dan $V=\lvert\mathcal{V}\rvert$.
+
+\subsection*{2.2\; Perhitungan BoW}
+Panjang dokumen:
+\[
+|d_1| = 3,\quad |d_2| = 4,\quad |d_3| = 3.
+\]
+Susunan vektor mengikuti urutan $\mathcal{V}$.
+\[
+\mathrm{BoW}(d_1) = [1,\,1,\,1,\,0,\,0,\,0,\,0,\,0]
+\]
+\[
+\mathrm{BoW}(d_2) = [0,\,1,\,0,\,1,\,1,\,1,\,0,\,0]
+\]
+\[
+\mathrm{BoW}(d_3) = [0,\,0,\,0,\,1,\,0,\,0,\,1,\,1]
+\]
+
+\section*{3.\; TF, DF, dan IDF}
+\subsection*{3.1\; Term Frequency (TF)}
+Gunakan TF ternormalisasi (proporsional terhadap panjang dokumen):
+\[
+\mathrm{tf}(t,d) = \frac{f_{t,d}}{|d|}.
+\]
+Contoh:
+\begin{itemize}
+  \item Di $d_1$: setiap kata yang muncul memiliki $\mathrm{tf}=\tfrac{1}{3}$.
+  \item Di $d_2$: setiap kata yang muncul memiliki $\mathrm{tf}=\tfrac{1}{4}$.
+  \item Di $d_3$: setiap kata yang muncul memiliki $\mathrm{tf}=\tfrac{1}{3}$.
+\end{itemize}
+
+\subsection*{3.2\; Document Frequency (DF)}
+$\mathrm{df}(t)$ adalah jumlah dokumen yang \emph{mengandung} kata $t$:
+\[
+\begin{aligned}
+&\mathrm{df}(\text{barang})=1 \ (d_1),\quad
+\mathrm{df}(\text{cepat})=2 \ (d_1,d_2),\quad
+\mathrm{df}(\text{sampai})=1 \ (d_1),\\
+&\mathrm{df}(\text{pengiriman})=2 \ (d_2,d_3),\quad
+\mathrm{df}(\text{dan})=1 \ (d_2),\quad
+\mathrm{df}(\text{rapi})=1 \ (d_2),\\
+&\mathrm{df}(\text{sangat})=1 \ (d_3),\quad
+\mathrm{df}(\text{lambat})=1 \ (d_3).
+\end{aligned}
+\]
+
+\subsection*{3.3\; Inverse Document Frequency (IDF)}
+Pakai varian IDF yang stabil terhadap pembagi nol:
+\[
+\mathrm{idf}(t) = \ln\!\Big(\frac{N}{1+\mathrm{df}(t)}\Big),\quad N=3.
+\]
+Maka:
+\[
+\mathrm{df}(t)=1 \;\Rightarrow\; \mathrm{idf}(t)=\ln\!\Big(\tfrac{3}{2}\Big)\approx 0.4055,\qquad
+\mathrm{df}(t)=2 \;\Rightarrow\; \mathrm{idf}(t)=\ln\!\Big(\tfrac{3}{3}\Big)=0.
+\]
+Konsekuensinya:
+\[
+\begin{aligned}
+&\mathrm{idf}(\text{barang})=\mathrm{idf}(\text{sampai})=\mathrm{idf}(\text{dan})=\mathrm{idf}(\text{rapi})=\mathrm{idf}(\text{sangat})=\mathrm{idf}(\text{lambat})\approx 0.4055,\\
+&\mathrm{idf}(\text{cepat})=\mathrm{idf}(\text{pengiriman})=0.
+\end{aligned}
+\]
+
+\section*{4.\; Vektor TF--IDF}
+Definisi dasar:
+\[
+\mathrm{tfidf}(t,d) = \mathrm{tf}(t,d)\cdot \mathrm{idf}(t).
+\]
+Kita tampilkan hanya komponen yang tidak nol (pembulatan 4 desimal).
+
+\subsection*{4.1\; Dokumen $d_1$ (``barang cepat sampai'')}
+\[
+\mathrm{tfidf}(\text{barang},d_1)=\tfrac{1}{3}\cdot 0.4055\approx 0.1352
+\]
+\[
+\mathrm{tfidf}(\text{cepat},d_1)=\tfrac{1}{3}\cdot 0=0
+\]
+\[
+\mathrm{tfidf}(\text{sampai},d_1)=\tfrac{1}{3}\cdot 0.4055\approx 0.1352
+\]
+Vektor TF--IDF (urutan $\mathcal{V}$):
+\[
+[\,0.1352,\,0,\,0.1352,\,0,\,0,\,0,\,0,\,0\,].
+\]
+
+\subsection*{4.2\; Dokumen $d_2$ (``pengiriman cepat dan rapi'')}
+\[
+\mathrm{tfidf}(\text{pengiriman},d_2)=\tfrac{1}{4}\cdot 0=0,\quad
+\mathrm{tfidf}(\text{cepat},d_2)=\tfrac{1}{4}\cdot 0=0,
+\]
+\[
+\mathrm{tfidf}(\text{dan},d_2)=\tfrac{1}{4}\cdot 0.4055\approx 0.1014,\quad
+\mathrm{tfidf}(\text{rapi},d_2)=\tfrac{1}{4}\cdot 0.4055\approx 0.1014.
+\]
+Vektor TF--IDF:
+\[
+[\,0,\,0,\,0,\,0,\,0.1014,\,0.1014,\,0,\,0\,].
+\]
+
+\subsection*{4.3\; Dokumen $d_3$ (``sangat lambat pengiriman'')}
+\[
+\mathrm{tfidf}(\text{sangat},d_3)=\tfrac{1}{3}\cdot 0.4055\approx 0.1352,\quad
+\mathrm{tfidf}(\text{lambat},d_3)=\tfrac{1}{3}\cdot 0.4055\approx 0.1352,
+\]
+\[
+\mathrm{tfidf}(\text{pengiriman},d_3)=\tfrac{1}{3}\cdot 0=0.
+\]
+Vektor TF--IDF:
+\[
+[\,0,\,0,\,0,\,0,\,0,\,0,\,0.1352,\,0.1352\,].
+\]
+
+\section*{5.\; Cosine Similarity (Contoh)}
+Misalkan ada \emph{query} $q$: ``barang cepat''. Dengan kosakata yang sama,
+\[
+|q|=2,\quad \mathrm{tf}(\text{barang},q)=\tfrac{1}{2},\quad \mathrm{tf}(\text{cepat},q)=\tfrac{1}{2}.
+\]
+Dengan $\mathrm{idf}(\text{barang})\approx 0.4055$ dan $\mathrm{idf}(\text{cepat})=0$:
+\[
+\mathrm{tfidf}(\text{barang},q)=\tfrac{1}{2}\cdot 0.4055 \approx 0.2027,\qquad
+\mathrm{tfidf}(\text{cepat},q)=\tfrac{1}{2}\cdot 0 = 0.
+\]
+Vektor TF--IDF $q$ (urutan $\mathcal{V}$):
+\[
+\mathbf{q}=[\,0.2027,\,0,\,0,\,0,\,0,\,0,\,0,\,0\,].
+\]
+
+Cosine similarity antara $\mathbf{q}$ dan $\mathbf{d}$ didefinisikan:
+\[
+\cos(\theta)=\frac{\mathbf{q}\cdot\mathbf{d}}{\lVert \mathbf{q}\rVert \,\lVert \mathbf{d}\rVert}.
+\]
+
+\paragraph{Dengan $d_1$.}
+\[
+\mathbf{d_1}=[\,0.1352,\,0,\,0.1352,\,0,\,0,\,0,\,0,\,0\,].
+\]
+\[
+\mathbf{q}\cdot\mathbf{d_1}=0.2027\times 0.1352 + 0\times 0.1352 = 0.0274.
+\]
+\[
+\|\mathbf{q}\|=\sqrt{0.2027^2}\approx 0.2027,\qquad
+\|\mathbf{d_1}\|=\sqrt{0.1352^2+0.1352^2}\approx \sqrt{2\times 0.0183}\approx 0.1913.
+\]
+\[
+\cos(\mathbf{q},\mathbf{d_1}) \approx \frac{0.0274}{0.2027\times 0.1913}
+\approx \frac{0.0274}{0.0388} \approx 0.706.
+\]
+
+\paragraph{Dengan $d_2$ dan $d_3$.}
+Karena $\mathbf{q}$ hanya memiliki komponen ``barang'' dan $d_2, d_3$ tidak memiliki ``barang'',
+\[
+\mathbf{q}\cdot\mathbf{d_2}=0,\quad \mathbf{q}\cdot\mathbf{d_3}=0
+\ \Rightarrow\ 
+\cos(\mathbf{q},\mathbf{d_2})=0,\quad \cos(\mathbf{q},\mathbf{d_3})=0.
+\]
+\textbf{Kesimpulan:} $q$ paling mirip ke $d_1$ (nilai cosine terbesar).
+
+\section*{6.\; Catatan Singkat tentang N\,-gram}
+Jika menggunakan \emph{bigram} untuk menangkap negasi:
+\[
+\text{dokumen: ``tidak bagus''} \quad \Rightarrow \quad \text{fitur bigram: ``tidak\_bagus''}.
+\]
+BoW bigram:
+\[
+\mathrm{BoW}_{\text{bigram}}(d) = [\, f(\text{``tidak\_bagus''}, d), \dots \,].
+\]
+Skor TF--IDF bigram dihitung sama: gunakan frekuensi bigram sebagai $f_{t,d}$ lalu kalikan dengan $\mathrm{idf}(t)$.
+
+\section*{7.\; Ringkasan}
+\begin{itemize}
+  \item BoW menghitung \emph{frekuensi kata} per dokumen.
+  \item TF--IDF menurunkan bobot kata yang \emph{terlalu umum} dan meninggikan kata \emph{informatif}.
+  \item Cosine similarity mengukur kedekatan vektor TF--IDF antar teks.
+  \item Vektor TF--IDF siap dipakai sebagai fitur untuk model klasik (LogReg/SVM/NB).
+\end{itemize}
+
+\end{document}

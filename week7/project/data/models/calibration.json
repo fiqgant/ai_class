@@ -1,0 +1,11 @@
+{
+  "global_thr": 10.0,
+  "thr_per_class": {
+    "anton": 10.0
+  },
+  "percentile": 95,
+  "extra_margin": 10.0,
+  "samples": {
+    "anton": 176
+  }
+}
