@@ -1,0 +1,316 @@
+\documentclass[11pt,a4paper]{article}
+
+% ================== Packages ==================
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{mathtools}
+\usepackage{siunitx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{lmodern}
+\usepackage[T1]{fontenc}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% ============== Listings setup (code) =========
+\lstdefinestyle{mystyle}{
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  commentstyle=\color{green!40!black}\itshape,
+  stringstyle=\color{red!50!black},
+  showstringspaces=false,
+  frame=single,
+  framerule=0.3pt,
+  rulecolor=\color{black!30},
+  numbers=left,
+  numberstyle=\tiny,
+  numbersep=8pt,
+  tabsize=2,
+  breaklines=true
+}
+\lstset{style=mystyle, language=Python}
+
+% ================ Title =======================
+\title{Grid Search, Random Search, K\,-Fold Cross-Validation, dan Tracking Hasil \\}
+\author{Taufiqurrahman}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Tujuan Pembelajaran}
+\begin{itemize}[leftmargin=1.2em]
+  \item Memahami \textbf{Grid Search} dan \textbf{Random Search} untuk tuning hyperparameter.
+  \item Menerapkan \textbf{K\,-Fold Cross-Validation} (termasuk variasi stratified dan time-aware).
+  \item Menyusun \textbf{skema tracking hasil} eksperimen yang rapi dan reprodusibel.
+\end{itemize}
+
+\section{Dasar: Hyperparameter Tuning}
+Misalkan model bergantung pada vektor hyperparameter
+\[
+\boldsymbol{\lambda} = (\lambda_1,\lambda_2,\dots,\lambda_d)\in\Lambda,
+\]
+dan fungsi skor validasi rata-rata (mis.\ akurasi atau F1) adalah
+\[
+\hat{J}(\boldsymbol{\lambda}) = \frac{1}{K}\sum_{k=1}^{K} s^{(k)}(\boldsymbol{\lambda}),
+\]
+dengan $s^{(k)}$ adalah skor pada lipatan (\emph{fold}) ke-$k$.
+
+Tujuan tuning:
+\[
+\boldsymbol{\lambda}^\star \in \arg\max_{\boldsymbol{\lambda}\in\Lambda}\ \hat{J}(\boldsymbol{\lambda}).
+\]
+
+\subsection{Grid Search}
+\paragraph{Ide.} Menyapu kisi (\emph{grid}) semua kombinasi kandidat setiap hyperparameter.
+
+\paragraph{Keunggulan.}
+\begin{itemize}[leftmargin=1.2em]
+  \item Implementasi sangat sederhana.
+  \item Reproducible: ruang yang dievaluasi deterministik.
+\end{itemize}
+
+\paragraph{Keterbatasan.}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Eksplosi kombinasi} saat dimensi meningkat; biaya komputasi cepat membesar.
+  \item Distribusi evaluasi tidak adaptif terhadap sensitivitas tiap dimensi.
+\end{itemize}
+
+\paragraph{Kompleksitas.}
+Jika tiap dimensi memiliki $m_i$ kandidat, total evaluasi
+\[
+M_{\text{grid}} = \prod_{i=1}^{d} m_i.
+\]
+
+\subsection{Random Search}
+\paragraph{Ide.} Mengambil sampel acak $\boldsymbol{\lambda}^{(1)},\dots,\boldsymbol{\lambda}^{(N)}$ dari distribusi prior pada ruang hyperparameter.
+
+\paragraph{Keunggulan.}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Efisien di dimensi tinggi}: menutup kemungkinan pemborosan di dimensi yang tidak penting.
+  \item Probabilistik: peluang menjangkau daerah baik meningkat dengan jumlah sampel.
+\end{itemize}
+
+\paragraph{Intuisi probabilistik.} Misalkan proporsi volume ruang yang ``bagus'' adalah $p\in(0,1]$. Probabilitas \emph{gagal} menemukan daerah bagus setelah $N$ sampel acak adalah
+\[
+P(\text{gagal}) = (1-p)^N,
+\]
+sehingga \emph{berhasil} minimal sekali adalah
+\[
+P(\text{berhasil}) = 1 - (1-p)^N.
+\]
+Saat $N$ naik, peluang menemukan setelan baik meningkat cepat bahkan untuk $p$ kecil.
+
+\paragraph{Keterbatasan.}
+\begin{itemize}[leftmargin=1.2em]
+  \item Hasil bervariasi antar-ulang; butuh \emph{seed} untuk reproduksibilitas.
+  \item Tanpa pengetahuan awal, distribusi sampel bisa kurang terarah (namun dapat diperbaiki dengan \emph{log-uniform} untuk skala lebar).
+\end{itemize}
+
+\subsection{Pemilihan Ruang Pencarian}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Skala log} untuk parameter positif yang rentangnya lebar, mis.\ $C\in[10^{-3},10^{3}]$:
+  \[
+  \log_{10} C \sim \mathcal{U}(-3, 3).
+  \]
+  \item \textbf{Distribusi diskret} untuk integer seperti jumlah tetangga $k\in\{1,3,5,7,\dots\}$.
+  \item \textbf{Kategori} untuk pilihan kernel, fungsi aktivasi, atau strategi penyeimbang kelas.
+\end{itemize}
+
+\section{K\,-Fold Cross-Validation (CV)}
+\subsection{Definisi}
+Bagi data menjadi $K$ lipatan berukuran hampir sama: $\mathcal{D} = \cup_{k=1}^K \mathcal{D}_k$ dan saling lepas. Untuk setiap $k$:
+\[
+\mathcal{D}_{\text{train}}^{(k)} = \mathcal{D}\setminus \mathcal{D}_k,\quad
+\mathcal{D}_{\text{val}}^{(k)} = \mathcal{D}_k.
+\]
+Latih model pada $\mathcal{D}_{\text{train}}^{(k)}$, evaluasi pada $\mathcal{D}_{\text{val}}^{(k)}$ menghasilkan skor $s^{(k)}$. Estimator performa:
+\[
+\hat{\mu} = \frac{1}{K}\sum_{k=1}^{K} s^{(k)},\qquad
+\hat{\sigma} = \sqrt{\frac{1}{K-1}\sum_{k=1}^{K}\big(s^{(k)}-\hat{\mu}\big)^2}.
+\]
+
+\subsection{Stratified K\,-Fold}
+Untuk klasifikasi, menjaga proporsi kelas serupa di tiap lipatan mengurangi variansi estimator:
+\[
+\text{Proporsi kelas di } \mathcal{D}_k \approx \text{proporsi global}.
+\]
+
+\subsection{Time-Aware (Time Series CV)}
+Jika data berurutan waktu, \textbf{jangan acak}:
+\[
+\begin{aligned}
+\mathcal{D}_{\text{train}}^{(1)} &= [1 : T_1], \quad \mathcal{D}_{\text{val}}^{(1)} = (T_1 : T_2],\\
+\mathcal{D}_{\text{train}}^{(2)} &= [1 : T_2], \quad \mathcal{D}_{\text{val}}^{(2)} = (T_2 : T_3], \ \text{dst.}
+\end{aligned}
+\]
+Meniru situasi prediksi masa depan, mencegah \emph{leakage} informasi dari masa depan ke masa lalu.
+
+\subsection{Ukuran $K$ dan Dampaknya}
+\begin{itemize}[leftmargin=1.2em]
+  \item $K$ kecil (mis.\ 3--5): latih lebih cepat, variansi estimator lebih tinggi.
+  \item $K$ lebih besar (mis.\ 10): latih lebih lama, variansi lebih rendah.
+  \item \emph{Leave-One-Out} (LOOCV, $K=n$): bias rendah, variansi tinggi, mahal komputasi.
+\end{itemize}
+
+\subsection{Nested CV (Singkat)}
+Untuk menghindari \emph{optimism bias} pada tuning, gunakan CV \emph{luar} untuk mengukur performa akhir dan CV \emph{dalam} untuk memilih hyperparameter. Estimator akhir:
+\[
+\hat{J}_{\text{nested}} = \frac{1}{K_{\text{outer}}}\sum_{o=1}^{K_{\text{outer}}}\ \max_{\boldsymbol{\lambda}\in\Lambda}\ \frac{1}{K_{\text{inner}}}\sum_{i=1}^{K_{\text{inner}}} s^{(o,i)}(\boldsymbol{\lambda}).
+\]
+
+\section{Praktik Anti-Leakage dalam CV}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Semua} transformasi berbasis data (\emph{imputation}, \emph{scaling}, \emph{encoding}, \emph{feature selection}) harus dipelajari \emph{hanya} dari \(\mathcal{D}_{\text{train}}^{(k)}\) dan kemudian diaplikasikan ke \(\mathcal{D}_{\text{val}}^{(k)}\).
+  \item Gunakan \textbf{pipeline} agar urutan transformasi konsisten dan aman.
+  \item Pada time series, pastikan \textbf{cutoff waktu} benar dan tidak mencampur masa depan ke masa lalu.
+\end{itemize}
+
+\section{Grid vs Random: Rangkuman Praktis}
+\begin{center}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Aspek & Grid Search & Random Search \\
+\midrule
+Sederhana & Sangat mudah & Mudah \\
+Skalabilitas dimensi & Buruk (eksplosi kombinasi) & Baik \\
+Eksplorasi awal & Kurang fleksibel & Sangat cocok \\
+Reproducible & Ya (deterministik) & Ya (dengan seed) \\
+Menemukan interaksi halus & Baik pada ruang kecil & Baik dengan $N$ memadai \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Tracking Hasil Eksperimen}
+\subsection{Mengapa Perlu Tracking?}
+\begin{itemize}[leftmargin=1.2em]
+  \item Menjaga \textbf{reprodusibilitas}: tahu persis konfigurasi yang menghasilkan skor.
+  \item Memungkinkan \textbf{perbandingan adil}: metrik, data split, versi paket.
+  \item Memudahkan \textbf{audit dan kolaborasi}.
+\end{itemize}
+
+\subsection{Apa yang Harus Dicatat?}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Metadata}: waktu, \emph{experiment\_id}, \emph{run\_id}, \emph{seed}, hostname.
+  \item \textbf{Data}: sumber dataset, ukuran train/val/test, skema fitur, \emph{hash} data (opsional).
+  \item \textbf{Konfigurasi}: nama model, ruang hyperparameter, nilai terpilih.
+  \item \textbf{Prosedur}: jenis CV ($K$, stratified/time-aware), \emph{pipeline} transformasi.
+  \item \textbf{Metrik}: mean $\hat{\mu}$, std $\hat{\sigma}$, confusion matrix, ROC-AUC, dsb.
+  \item \textbf{Artefak}: model terserialisasi, \emph{scaler/encoder}, grafik penting.
+  \item \textbf{Versi}: commit git, versi paket Python, OS.
+\end{itemize}
+
+\subsection{Format Pencatatan Sederhana}
+\paragraph{CSV / JSON Log.} Satu baris per \emph{run}:
+\[
+\texttt{run\_id, time, model, space, method, K, seed, mean\_score, std\_score, best\_params, notes}
+\]
+Contoh (JSON singkat):
+\begin{lstlisting}
+{
+  "run_id": "2025-12-01_14-10-22",
+  "model": "LogisticRegression",
+  "search": "random",
+  "space": {"C": "loguniform[1e-3, 1e3]", "penalty": ["l2"]},
+  "cv": {"type": "stratified", "k": 5, "seed": 42},
+  "score": {"metric": "f1_macro", "mean": 0.842, "std": 0.011},
+  "best_params": {"C": 2.31, "penalty": "l2"},
+  "data": {"train": 12000, "val_total": 3000, "features": 512},
+  "env": {"python": "3.12", "sklearn": "1.5.2"},
+  "git": {"commit": "a1b2c3d"},
+  "notes": "ngram=(1,2), min_df=3"
+}
+\end{lstlisting}
+
+\paragraph{Struktur Direktori Artefak.}
+\begin{lstlisting}
+experiments/
+├─ 2025-12-01_14-10-22/           # run_id
+│  ├─ config.json
+│  ├─ metrics.json
+│  ├─ model.pkl                   # model terlatih
+│  ├─ pipeline.pkl                # full pipeline (preprocess + model)
+│  ├─ cm.png                      # confusion matrix
+│  └─ requirements-freeze.txt     # daftar versi paket
+\end{lstlisting}
+
+\subsection{Checklist Reprodusibilitas}
+\begin{itemize}[leftmargin=1.2em]
+  \item Tetapkan \textbf{random seed} untuk semua komponen yang relevan.
+  \item Simpan \textbf{split} (indeks fold) atau simpan \textbf{generator} CV.
+  \item \textbf{Freeze} versi paket pada saat \emph{best run}.
+  \item Simpan \textbf{pipeline lengkap} (anti-leakage) dan \textbf{konfigurasi}.
+\end{itemize}
+
+\section{Contoh Pseudocode (sklearn)}
+\subsection{Grid Search + Stratified K\,-Fold}
+\begin{lstlisting}
+from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+
+pipe = Pipeline([
+  ("sc", StandardScaler(with_mean=False)),  # contoh bila fitur sparse: with_mean=False
+  ("clf", LogisticRegression(max_iter=1000))
+])
+
+param_grid = {
+  "clf__C": [0.01, 0.1, 1, 10, 100],
+  "clf__penalty": ["l2"],
+}
+
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+search = GridSearchCV(pipe, param_grid, scoring="f1_macro", cv=cv, n_jobs=-1)
+search.fit(X, y)
+
+best = search.best_params_
+mean = search.best_score_
+\end{lstlisting}
+
+\subsection{Random Search (log-uniform) + Tracking Ringkas}
+\begin{lstlisting}
+import numpy as np, json, time
+from scipy.stats import loguniform
+from sklearn.model_selection import StratifiedKFold, RandomizedSearchCV
+
+param_dist = {
+  "clf__C": loguniform(1e-3, 1e3),
+}
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+rnd = RandomizedSearchCV(pipe, param_distributions=param_dist,
+                         n_iter=40, scoring="f1_macro", cv=cv, n_jobs=-1,
+                         random_state=42)
+rnd.fit(X, y)
+
+run_id = time.strftime("%Y-%m-%d_%H-%M-%S")
+log = {
+  "run_id": run_id,
+  "search": "random",
+  "best_params": rnd.best_params_,
+  "best_score": float(rnd.best_score_)
+}
+with open(f"experiments/{run_id}_metrics.json", "w") as f:
+  json.dump(log, f, indent=2)
+\end{lstlisting}
+
+\section{Strategi Praktis}
+\begin{itemize}[leftmargin=1.2em]
+  \item Mulai dengan \textbf{random search} untuk eksplorasi cepat; lanjutkan \textbf{grid lokal} di sekitar rentang menjanjikan.
+  \item Gunakan \textbf{skala log} untuk hyperparameter sensitif skala (mis.\ $C$, learning rate).
+  \item Pastikan \textbf{CV sesuai data}: stratified untuk klasifikasi; time-aware untuk data berurut.
+  \item Terapkan \textbf{pipeline} agar aman dari \emph{leakage} dan mudah diserialisasi.
+  \item \textbf{Track} semua run penting; simpan artefak agar mudah \emph{roll-back}.
+\end{itemize}
+
+\section{Ringkasan}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Grid} cocok untuk ruang kecil dan kebutuhan deterministik.
+  \item \textbf{Random} efektif di ruang besar/tinggi dimensi; peluang temuan baik meningkat dengan jumlah sampel.
+  \item \textbf{K\,-Fold} memberikan estimasi performa yang lebih stabil dibanding satu split; pilih variasi yang sesuai (stratified / time-aware).
+  \item \textbf{Tracking hasil} adalah fondasi reprodusibilitas dan kolaborasi yang sehat.
+\end{itemize}
+
+\end{document}
